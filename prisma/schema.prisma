@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  calls     Call[]
+}
+
+model Call {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Call Details
+  targetNumber          String
+  twilioCallSid         String?  @unique
+  amdStrategy           String   // 'twilio_native', 'jambonz', 'huggingface', 'gemini'
+  
+  // Detection Results
+  status                String   // 'initiated', 'ringing', 'in_progress', 'completed', 'failed', 'no_answer', 'busy'
+  amdResult             String?  // 'human', 'machine', 'voicemail', 'fax', 'unknown', 'undecided'
+  amdConfidence         Float?   // 0.0 to 1.0
+  detectionTimeMs       Int?     // Time taken to detect in milliseconds
+  
+  // Audio & Transcription
+  audioUrl              String?
+  transcription         String?
+  
+  // Timing
+  dialedAt              DateTime @default(now())
+  answeredAt            DateTime?
+  endedAt               DateTime?
+  duration              Int?     // Total call duration in seconds
+  
+  // Additional Data
+  errorMessage          String?
+  metadata              Json?    // Flexible field for strategy-specific data
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([userId, dialedAt])
+  @@index([amdStrategy, amdResult])
+  @@index([status])
+}
+
+model CallLog {
+  id                String   @id @default(cuid())
+  callId            String
+  
+  // Log Entry
+  timestamp         DateTime @default(now())
+  level             String   // 'info', 'warn', 'error', 'debug'
+  event             String   // Event type (e.g., 'call_initiated', 'amd_detection', 'audio_received')
+  message           String
+  data              Json?    // Additional structured data
+  
+  @@index([callId, timestamp])
+}
+
+model AmdTestResult {
+  id                String   @id @default(cuid())
+  
+  // Test Details
+  testNumber        String   // The number dialed for testing
+  expectedResult    String   // 'human' or 'machine'
+  amdStrategy       String
+  
+  // Results
+  detectedResult    String?
+  confidence        Float?
+  detectionTimeMs   Int?
+  accuracy          Boolean? // True if detected correctly
+  
+  // Metadata
+  notes             String?
+  testRunId         String?  // Group related tests
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([amdStrategy, accuracy])
+  @@index([testRunId])
+}
